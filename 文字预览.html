@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>字体预览 / PNG / SVG / DXF 导出工具</title>
+<style>
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    padding: 24px;
+    font-family: -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
+    background: #ececec;
+    color: #222;
+  }
+
+  .panel {
+    display: grid;
+    grid-template-columns: 410px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .controls,
+  .preview-wrapper {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  }
+
+  .controls {
+    padding: 22px;
+  }
+
+  .controls h2 {
+    margin: 0 0 18px;
+    font-size: 20px;
+  }
+
+  .group {
+    margin-bottom: 16px;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  label {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #444;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    width: 100%;
+    font-size: 14px;
+  }
+
+  input,
+  textarea,
+  select {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  textarea {
+    min-height: 110px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+
+  button {
+    border: none;
+    border-radius: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    font-weight: 700;
+    background: #111;
+    color: #fff;
+    margin-top: 6px;
+  }
+
+  button:hover {
+    opacity: 0.9;
+  }
+
+  .secondary-btn {
+    background: #444;
+  }
+
+  .cad-btn {
+    background: #6b2b1f;
+  }
+
+  .preview-wrapper {
+    padding: 24px;
+    overflow: auto;
+  }
+
+  .preview-title {
+    margin-bottom: 14px;
+    font-size: 14px;
+    color: #555;
+  }
+
+  .checkerboard {
+    display: inline-block;
+    background-color: #fff;
+    background-image:
+      linear-gradient(45deg, #e5e5e5 25%, transparent 25%),
+      linear-gradient(-45deg, #e5e5e5 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #e5e5e5 75%),
+      linear-gradient(-45deg, transparent 75%, #e5e5e5 75%);
+    background-size: 24px 24px;
+    background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+    border-radius: 8px;
+  }
+
+  #exportArea {
+    width: 1200px;
+    height: 600px;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 80px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #previewText {
+    font-size: 88px;
+    line-height: 1.25;
+    letter-spacing: 0.08em;
+    text-align: center;
+    white-space: pre-wrap;
+    word-break: keep-all;
+    color: #111111;
+  }
+
+  .hint {
+    font-size: 12px;
+    line-height: 1.6;
+    color: #777;
+    margin-top: 14px;
+  }
+
+  .drop-zone {
+    border: 2px dashed #aaa;
+    border-radius: 12px;
+    padding: 18px;
+    text-align: center;
+    font-size: 13px;
+    color: #666;
+    background: #fafafa;
+    transition: 0.2s;
+  }
+
+  .drop-zone.dragover {
+    border-color: #111;
+    background: #f0f0f0;
+    color: #111;
+  }
+
+  .font-count {
+    font-size: 12px;
+    color: #666;
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+
+  .divider {
+    height: 1px;
+    background: #e5e5e5;
+    margin: 18px 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="panel">
+  <div class="controls">
+    <h2>字体预览 / PNG / SVG / DXF 导出</h2>
+
+    <div class="group">
+      <label>拖拽字体文件到这里</label>
+      <div id="dropZone" class="drop-zone">
+        支持 .ttf / .otf / .woff / .woff2<br>
+        可一次拖入多个字体文件
+      </div>
+    </div>
+
+    <div class="group">
+      <label>或手动选择多个字体文件</label>
+      <input type="file" id="fontInput" accept=".ttf,.otf,.woff,.woff2" multiple>
+      <div id="fontCount" class="font-count">当前已加载 0 个字体</div>
+    </div>
+
+    <div class="group">
+      <label>当前预览字体</label>
+      <select id="fontSelect">
+        <option value="">未加载字体（使用系统默认字体）</option>
+      </select>
+    </div>
+
+    <div class="group">
+      <label>预览文字</label>
+      <textarea id="textInput">智慧产业园
+ZHISHI INDUSTRIAL PARK</textarea>
+    </div>
+
+    <div class="row">
+      <div class="group">
+        <label>导出宽度 px / CAD宽度</label>
+        <input type="number" id="exportWidth" value="1200" min="100">
+      </div>
+      <div class="group">
+        <label>导出高度 px / CAD高度</label>
+        <input type="number" id="exportHeight" value="600" min="100">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="group">
+        <label>字号 px / CAD字高</label>
+        <input type="number" id="fontSize" value="88" min="10">
+      </div>
+      <div class="group">
+        <label>字距 em</label>
+        <input type="number" id="letterSpacing" value="0.08" step="0.01">
+      </div>
+    </div>
+
+    <div class="group">
+      <label>文字颜色</label>
+      <input type="color" id="textColor" value="#111111">
+    </div>
+
+    <div class="group">
+      <label>曲线精度 / 折线近似误差 <span id="toleranceValue" style="font-weight:400; color:#888;">1.0</span> (CAD单位)</label>
+      <input type="range" id="curveTolerance" value="1" min="0.1" max="10" step="0.1" style="width:100%;">
+    </div>
+
+    <div class="group">
+      <label>文件名</label>
+      <input type="text" id="fileName" value="font-preview">
+    </div>
+
+    <button id="exportBtn">导出当前字体透明 PNG</button>
+    <button id="exportSvgBtn" class="secondary-btn">导出当前字体 SVG 矢量文件</button>
+    <button id="exportDxfBtn" class="cad-btn">导出当前字体轮廓 DXF 文件</button>
+
+    <div class="divider"></div>
+
+    <div class="row">
+      <div class="group">
+        <label>对比图宽度 px</label>
+        <input type="number" id="compareWidth" value="1800" min="300">
+      </div>
+      <div class="group">
+        <label>每行高度 px</label>
+        <input type="number" id="compareRowHeight" value="180" min="80">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="group">
+        <label>对比图字号 px</label>
+        <input type="number" id="compareFontSize" value="64" min="10">
+      </div>
+      <div class="group">
+        <label>对比图字距 em</label>
+        <input type="number" id="compareLetterSpacing" value="0.06" step="0.01">
+      </div>
+    </div>
+
+    <button id="exportCompareBtn" class="secondary-btn">导出全部字体对比图 PNG</button>
+
+    <div class="hint">
+      说明：PNG / SVG 为透明背景。DXF 轮廓文件通过 Canvas 渲染 + 边缘追踪提取闭合多段线（转曲），无需外部依赖，支持系统字体及任意加载字体。可在 AutoCAD 中打开直接用于激光切割 / CNC 加工，另存为 DWG 即可。调节"曲线精度"平衡平滑度与文件大小。
+    </div>
+  </div>
+
+  <div class="preview-wrapper">
+    <div class="preview-title">单个字体预览区域 / 透明背景</div>
+
+    <div class="checkerboard">
+      <div id="exportArea">
+        <div id="previewText">智慧产业园
+ZHISHI INDUSTRIAL PARK</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const fontInput = document.getElementById("fontInput");
+const fontSelect = document.getElementById("fontSelect");
+const dropZone = document.getElementById("dropZone");
+const fontCount = document.getElementById("fontCount");
+
+const textInput = document.getElementById("textInput");
+const previewText = document.getElementById("previewText");
+const exportArea = document.getElementById("exportArea");
+
+const exportWidth = document.getElementById("exportWidth");
+const exportHeight = document.getElementById("exportHeight");
+const fontSize = document.getElementById("fontSize");
+const letterSpacing = document.getElementById("letterSpacing");
+const textColor = document.getElementById("textColor");
+const fileName = document.getElementById("fileName");
+
+const exportBtn = document.getElementById("exportBtn");
+const exportSvgBtn = document.getElementById("exportSvgBtn");
+const exportDxfBtn = document.getElementById("exportDxfBtn");
+const curveTolerance = document.getElementById("curveTolerance");
+const toleranceValue = document.getElementById("toleranceValue");
+
+const compareWidth = document.getElementById("compareWidth");
+const compareRowHeight = document.getElementById("compareRowHeight");
+const compareFontSize = document.getElementById("compareFontSize");
+const compareLetterSpacing = document.getElementById("compareLetterSpacing");
+const exportCompareBtn = document.getElementById("exportCompareBtn");
+
+let loadedFonts = [];
+let currentFontName = "";
+
+/* 手动选择字体 */
+fontInput.addEventListener("change", async function () {
+  const files = Array.from(this.files || []);
+  await loadFontFiles(files);
+  this.value = "";
+});
+
+/* 拖拽字体 */
+["dragenter", "dragover"].forEach(eventName => {
+  dropZone.addEventListener(eventName, function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    dropZone.classList.add("dragover");
+  });
+});
+
+["dragleave", "drop"].forEach(eventName => {
+  dropZone.addEventListener(eventName, function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    dropZone.classList.remove("dragover");
+  });
+});
+
+dropZone.addEventListener("drop", async function (e) {
+  const files = Array.from(e.dataTransfer.files || []);
+  await loadFontFiles(files);
+});
+
+/* 加载多个字体 */
+async function loadFontFiles(files) {
+  if (!files.length) return;
+
+  const validFiles = files.filter(file => /\.(ttf|otf|woff|woff2)$/i.test(file.name));
+
+  for (const file of validFiles) {
+    const fontName = buildUniqueFontName(file.name);
+    const fontUrl = URL.createObjectURL(file);
+    const dataUrl = await fileToDataURL(file);
+    const arrayBuffer = await file.arrayBuffer();
+
+    try {
+      const fontFace = new FontFace(fontName, `url(${fontUrl})`);
+      await fontFace.load();
+      document.fonts.add(fontFace);
+
+      loadedFonts.push({
+        name: fontName,
+        label: file.name,
+        dataUrl: dataUrl,
+        buffer: arrayBuffer
+      });
+    } catch (err) {
+      console.error("字体加载失败：", file.name, err);
+    }
+  }
+
+  refreshFontSelect();
+
+  if (!currentFontName && loadedFonts.length) {
+    currentFontName = loadedFonts[0].name;
+    fontSelect.value = currentFontName;
+  }
+
+  updatePreview();
+}
+
+fontSelect.addEventListener("change", function () {
+  currentFontName = this.value;
+  updatePreview();
+});
+
+textInput.addEventListener("input", updatePreview);
+
+[
+  exportWidth,
+  exportHeight,
+  fontSize,
+  letterSpacing,
+  textColor
+].forEach(el => {
+  el.addEventListener("input", updatePreview);
+});
+
+curveTolerance.addEventListener("input", function () {
+  toleranceValue.textContent = Number(this.value).toFixed(1);
+});
+
+function buildUniqueFontName(fileName) {
+  const clean = fileName
+    .replace(/\.[^/.]+$/, "")
+    .replace(/[^\w\u4e00-\u9fa5-]/g, "_");
+
+  return `PreviewFont_${clean}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+}
+
+function refreshFontSelect() {
+  fontSelect.innerHTML = "";
+
+  const defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "系统默认字体";
+  fontSelect.appendChild(defaultOption);
+
+  loadedFonts.forEach(font => {
+    const option = document.createElement("option");
+    option.value = font.name;
+    option.textContent = font.label;
+    fontSelect.appendChild(option);
+  });
+
+  fontSelect.value = currentFontName || "";
+  fontCount.textContent = `当前已加载 ${loadedFonts.length} 个字体`;
+}
+
+function updatePreview() {
+  previewText.textContent = textInput.value;
+
+  exportArea.style.width = exportWidth.value + "px";
+  exportArea.style.height = exportHeight.value + "px";
+
+  previewText.style.fontSize = fontSize.value + "px";
+  previewText.style.letterSpacing = letterSpacing.value + "em";
+  previewText.style.color = textColor.value;
+
+  if (currentFontName) {
+    previewText.style.fontFamily = `"${currentFontName}", "Microsoft YaHei", sans-serif`;
+  } else {
+    previewText.style.fontFamily = `"Microsoft YaHei", sans-serif`;
+  }
+}
+
+/* 导出当前字体透明 PNG */
+exportBtn.addEventListener("click", async function () {
+  await document.fonts.ready;
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  const width = Number(exportWidth.value);
+  const height = Number(exportHeight.value);
+  const size = Number(fontSize.value);
+  const spacingPx = size * Number(letterSpacing.value);
+
+  canvas.width = width;
+  canvas.height = height;
+
+  // 透明背景
+  ctx.clearRect(0, 0, width, height);
+
+  ctx.fillStyle = textColor.value;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `${size}px ${currentFontName ? `"${currentFontName}"` : `"Microsoft YaHei"`}, sans-serif`;
+
+  const lines = textInput.value.split("\n");
+  const lineHeight = size * 1.25;
+  const totalHeight = lineHeight * lines.length;
+  const startY = height / 2 - totalHeight / 2 + lineHeight / 2;
+
+  lines.forEach((line, index) => {
+    drawTextWithLetterSpacing(
+      ctx,
+      line,
+      width / 2,
+      startY + index * lineHeight,
+      spacingPx
+    );
+  });
+
+  const selectedFont = loadedFonts.find(f => f.name === currentFontName);
+  const fontLabel = selectedFont ? selectedFont.label.replace(/\.[^/.]+$/, "") : "system";
+
+  downloadCanvas(
+    canvas,
+    `${cleanFileName(fileName.value || "font-preview")}_${cleanFileName(fontLabel)}.png`
+  );
+});
+
+/* 导出当前字体 SVG */
+exportSvgBtn.addEventListener("click", async function () {
+  await document.fonts.ready;
+
+  const width = Number(exportWidth.value);
+  const height = Number(exportHeight.value);
+  const size = Number(fontSize.value);
+  const spacingEm = Number(letterSpacing.value);
+  const color = textColor.value;
+  const text = textInput.value;
+
+  const selectedFont = loadedFonts.find(f => f.name === currentFontName);
+  const fontFamily = selectedFont ? selectedFont.name : "Microsoft YaHei";
+  const fontLabel = selectedFont ? selectedFont.label.replace(/\.[^/.]+$/, "") : "system";
+
+  const lines = text.split("\n");
+  const lineHeight = size * 1.25;
+  const totalHeight = lineHeight * lines.length;
+  const startY = height / 2 - totalHeight / 2 + lineHeight / 2;
+
+  let fontFaceStyle = "";
+
+  if (selectedFont && selectedFont.dataUrl) {
+    fontFaceStyle = `
+      @font-face {
+        font-family: '${escapeCss(fontFamily)}';
+        src: url('${selectedFont.dataUrl}');
+      }
+    `;
+  }
+
+  const textElements = lines.map((line, index) => {
+    const y = startY + index * lineHeight;
+    return `
+      <text
+        x="${width / 2}"
+        y="${y}"
+        text-anchor="middle"
+        dominant-baseline="middle"
+        font-family="${escapeXml(fontFamily)}"
+        font-size="${size}"
+        letter-spacing="${spacingEm}em"
+        fill="${color}"
+      >${escapeXml(line)}</text>
+    `;
+  }).join("\n");
+
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="${width}"
+  height="${height}"
+  viewBox="0 0 ${width} ${height}"
+>
+  <defs>
+    <style>
+      ${fontFaceStyle}
+    </style>
+  </defs>
+  ${textElements}
+</svg>`;
+
+  downloadTextFile(
+    svg,
+    `${cleanFileName(fileName.value || "font-preview")}_${cleanFileName(fontLabel)}.svg`,
+    "image/svg+xml;charset=utf-8"
+  );
+});
+
+/* 导出当前字体轮廓 DXF（Canvas 渲染 → Marching Squares 边缘追踪） */
+exportDxfBtn.addEventListener("click", async function () {
+  await document.fonts.ready;
+
+  const width = Number(exportWidth.value);
+  const height = Number(exportHeight.value);
+  const size = Number(fontSize.value);
+  const text = textInput.value;
+  const tolerance = Number(curveTolerance.value);
+  const spacingEm = Number(letterSpacing.value);
+
+  const selectedFont = loadedFonts.find(f => f.name === currentFontName);
+  const fontFamily = selectedFont ? selectedFont.name : "Microsoft YaHei";
+  const fontLabel = selectedFont ? selectedFont.label.replace(/\.[^/.]+$/, "") : "system";
+
+  // 4 倍分辨率渲染，保证边缘追踪精度
+  const RES = 4;
+
+  const polylines = textToOutlines({
+    fontFamily, text, fontSize: size,
+    canvasWidth: width, canvasHeight: height,
+    resolution: RES,
+    simplifyTolerance: tolerance,
+    letterSpacingEm: spacingEm
+  });
+
+  if (!polylines.length) {
+    alert("未能提取文字轮廓，请确认文字内容及字体是否正常。");
+    return;
+  }
+
+  __dxfHandleCounter = 0;
+  let entities = "";
+  polylines.forEach(poly => {
+    entities += dxfLwPolylineEntity(poly, "TEXT_OUTLINE");
+  });
+
+  const dxf = buildDxfOutline({ entities, layerName: "TEXT_OUTLINE" });
+
+  downloadTextFile(
+    dxf,
+    `${cleanFileName(fileName.value || "font-preview")}_${cleanFileName(fontLabel)}_outline.dxf`,
+    "application/dxf"
+  );
+});
+
+/* 导出全部字体对比图透明 PNG */
+exportCompareBtn.addEventListener("click", async function () {
+  await document.fonts.ready;
+
+  if (!loadedFonts.length) {
+    alert("请先加载至少一个字体文件");
+    return;
+  }
+
+  const width = Number(compareWidth.value);
+  const rowHeight = Number(compareRowHeight.value);
+  const size = Number(compareFontSize.value);
+  const spacingPx = size * Number(compareLetterSpacing.value);
+
+  const paddingX = 80;
+  const labelWidth = 360;
+  const textStartX = paddingX + labelWidth + 60;
+
+  const height = rowHeight * loadedFonts.length;
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  canvas.width = width;
+  canvas.height = height;
+
+  // 透明背景
+  ctx.clearRect(0, 0, width, height);
+
+  loadedFonts.forEach((font, index) => {
+    const yCenter = rowHeight * index + rowHeight / 2;
+
+    // 左侧字体文件名
+    ctx.fillStyle = textColor.value;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.font = `26px "Microsoft YaHei", sans-serif`;
+
+    const label = font.label.replace(/\.[^/.]+$/, "");
+    ctx.fillText(label, paddingX, yCenter);
+
+    // 右侧字体效果
+    ctx.fillStyle = textColor.value;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.font = `${size}px "${font.name}", "Microsoft YaHei", sans-serif`;
+
+    const previewLine = textInput.value.replace(/\n/g, " / ");
+    drawTextWithLetterSpacingLeft(
+      ctx,
+      previewLine,
+      textStartX,
+      yCenter,
+      spacingPx,
+      width - textStartX - paddingX
+    );
+
+    // 分隔线
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    ctx.strokeStyle = textColor.value;
+    ctx.beginPath();
+    ctx.moveTo(paddingX, rowHeight * (index + 1));
+    ctx.lineTo(width - paddingX, rowHeight * (index + 1));
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  downloadCanvas(
+    canvas,
+    `${cleanFileName(fileName.value || "font-compare")}_all-fonts-compare.png`
+  );
+});
+
+/* ====== Canvas 位图渲染 + Marching Squares 边缘追踪 → DXF 多段线 ====== */
+
+/*
+  核心流程：
+  1. 用 Canvas 4 倍分辨率渲染文字
+  2. Marching Squares 提取 sub-pixel 精度的轮廓线段
+  3. 连接相邻线段为闭合多段线
+  4. Douglas-Peucker 简化 + Y 轴翻转 → CAD 坐标
+*/
+
+function textToOutlines(opts) {
+  const {fontFamily, text, fontSize, canvasWidth, canvasHeight, resolution, simplifyTolerance, letterSpacingEm = 0} = opts;
+  const w = Math.round(canvasWidth * resolution);
+  const h = Math.round(canvasHeight * resolution);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+
+  // 白底黑字，后续以暗像素为填充区域
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `${fontSize * resolution}px "${fontFamily}", "Microsoft YaHei", sans-serif`;
+
+  const lines = text.split('\n');
+  const lineH = fontSize * resolution * 1.25;
+  const spacingPx = fontSize * resolution * letterSpacingEm;
+  const totalH = lines.length * lineH;
+  const startY = h / 2 - totalH / 2 + lineH / 2;
+
+  lines.forEach((line, i) => {
+    drawTextWithLetterSpacing(ctx, line, w / 2, startY + i * lineH, spacingPx);
+  });
+
+  // 提取像素 → 二值图（1 = 填充/文字, 0 = 背景）
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const binary = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    binary[i] = imgData.data[i * 4] < 128 ? 1 : 0;
+  }
+
+  // Marching Squares 提取轮廓线段
+  const segments = marchingSquares(binary, w, h);
+
+  // 连接线段 → 闭合多段线
+  const chains = joinSegmentsToChains(segments);
+
+  // 缩放回逻辑坐标 + 翻转 Y（Canvas Y↓ → CAD Y↑）
+  const scale = 1 / resolution;
+  const result = [];
+  for (const chain of chains) {
+    const pts = chain.map(([x, y]) => ({x: x * scale, y: canvasHeight - y * scale}));
+    if (pts.length < 2) continue;
+    const simplified = simplifyPolyline(pts, simplifyTolerance);
+    if (simplified.length >= 3) result.push(simplified);
+  }
+  return result;
+}
+
+/* ── Marching Squares 线段提取 ── */
+function marchingSquares(binary, w, h) {
+  // 边缘中点（单位正方形内）
+  const edges = [
+    [0.5, 1.0], // 0: 下边中点
+    [0.0, 0.5], // 1: 左边中点
+    [0.5, 0.0], // 2: 上边中点
+    [1.0, 0.5], // 3: 右边中点
+  ];
+  // 16 种情况的边缘连接对 [a, b] 或 [a, b, c, d]
+  const LUT = [
+    [],               // 0
+    [0, 1],           // 1: BL
+    [0, 3],           // 2: BR
+    [1, 3],           // 3: BL+BR
+    [2, 3],           // 4: TR
+    [2, 0, 1, 3],     // 5: TR+BL (saddle)
+    [2, 0],           // 6: TR+BR
+    [2, 1],           // 7: TR+BR+BL
+    [2, 1],           // 8: TL
+    [2, 0],           // 9: TL+BL
+    [1, 0, 3, 2],     // 10: TL+BR (saddle)
+    [2, 3],           // 11: TL+BR+BL
+    [1, 3],           // 12: TL+TR
+    [0, 3],           // 13: TL+TR+BL
+    [0, 1],           // 14: TL+TR+BR
+    [],               // 15
+  ];
+  const segs = [];
+  for (let y = 0; y < h - 1; y++) {
+    for (let x = 0; x < w - 1; x++) {
+      const tl = binary[y * w + x];
+      const tr = binary[y * w + x + 1];
+      const br = binary[(y + 1) * w + x + 1];
+      const bl = binary[(y + 1) * w + x];
+      const idx = (tl << 3) | (tr << 2) | (br << 1) | bl;
+      const pairs = LUT[idx];
+      for (let k = 0; k < pairs.length; k += 2) {
+        const e0 = edges[pairs[k]];
+        const e1 = edges[pairs[k + 1]];
+        segs.push([x + e0[0], y + e0[1], x + e1[0], y + e1[1]]);
+      }
+    }
+  }
+  return segs;
+}
+
+/* ── 线段连接为闭合多段线 ── */
+function joinSegmentsToChains(segments) {
+  if (!segments.length) return [];
+  // 建立端点 → 线段索引的映射
+  const map = new Map();
+  const key = (x, y) => `${x.toFixed(6)},${y.toFixed(6)}`;
+  for (let i = 0; i < segments.length; i++) {
+    const [x1, y1, x2, y2] = segments[i];
+    for (const [px, py] of [[x1, y1], [x2, y2]]) {
+      const k = key(px, py);
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(i);
+    }
+  }
+  const used = new Uint8Array(segments.length);
+  const chains = [];
+  for (let i = 0; i < segments.length; i++) {
+    if (used[i]) continue;
+    used[i] = 1;
+    const chain = [];
+    const [sx1, sy1, sx2, sy2] = segments[i];
+    chain.push([sx1, sy1], [sx2, sy2]);
+    // 从尾部继续连接
+    let head = [sx2, sy2];
+    while (true) {
+      const k = key(head[0], head[1]);
+      const cands = map.get(k) || [];
+      let found = false;
+      for (const j of cands) {
+        if (used[j]) continue;
+        used[j] = 1;
+        const [a1, b1, a2, b2] = segments[j];
+        const next = (Math.abs(a1 - head[0]) < 1e-4 && Math.abs(b1 - head[1]) < 1e-4) ? [a2, b2] : [a1, b1];
+        chain.push(next);
+        head = next;
+        found = true;
+        break;
+      }
+      if (!found) break;
+    }
+    if (chain.length >= 3) chains.push(chain);
+  }
+  return chains;
+}
+
+/* ── Douglas-Peucker 多段线简化 ── */
+function simplifyPolyline(pts, eps) {
+  if (pts.length <= 2) return pts;
+  const dist = (p, a, b) => {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+    return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+  };
+  const stack = [[0, pts.length - 1]];
+  const keep = new Uint8Array(pts.length);
+  keep[0] = keep[pts.length - 1] = 1;
+  while (stack.length) {
+    const [lo, hi] = stack.pop();
+    let maxD = 0, maxI = lo;
+    for (let i = lo + 1; i < hi; i++) {
+      const d = dist(pts[i], pts[lo], pts[hi]);
+      if (d > maxD) { maxD = d; maxI = i; }
+    }
+    if (maxD > eps) {
+      keep[maxI] = 1;
+      stack.push([lo, maxI], [maxI, hi]);
+    }
+  }
+  const out = [];
+  for (let i = 0; i < pts.length; i++) {
+    if (keep[i]) out.push(pts[i]);
+  }
+  return out;
+}
+
+/* ── DXF 生成 ── */
+
+let __dxfHandleCounter = 0;
+function dxfHandle() {
+  return (++__dxfHandleCounter).toString(16).toUpperCase();
+}
+
+function dxfLwPolylineEntity(poly, layer) {
+  const cleaned = normalizeDxfPolyline(poly);
+  if (cleaned.length < 3) return "";
+
+  const lines = [
+    "0", "POLYLINE",
+    "8", layer,
+    "66", "1",
+    "70", "1",
+    "10", "0",
+    "20", "0",
+    "30", "0"
+  ];
+
+  cleaned.forEach(p => {
+    lines.push(
+      "0", "VERTEX",
+      "8", layer,
+      "10", dxfNumber(p.x),
+      "20", dxfNumber(p.y),
+      "30", "0"
+    );
+  });
+
+  lines.push("0", "SEQEND", "8", layer);
+  return lines.join("\r\n") + "\r\n";
+}
+
+function buildDxfOutline({ entities, layerName }) {
+  const lines = [
+    "0", "SECTION",
+    "2", "HEADER",
+    "9", "$ACADVER",
+    "1", "AC1009",
+    "9", "$HANDLING",
+    "70", "0",
+    "0", "ENDSEC",
+    "0", "SECTION",
+    "2", "TABLES",
+    "0", "TABLE",
+    "2", "LTYPE",
+    "70", "1",
+    "0", "LTYPE",
+    "2", "CONTINUOUS",
+    "70", "0",
+    "3", "Solid line",
+    "72", "65",
+    "73", "0",
+    "40", "0",
+    "0", "ENDTAB",
+    "0", "TABLE",
+    "2", "LAYER",
+    "70", "2",
+    "0", "LAYER",
+    "2", "0",
+    "70", "0",
+    "62", "7",
+    "6", "CONTINUOUS",
+    "0", "LAYER",
+    "2", layerName,
+    "70", "0",
+    "62", "7",
+    "6", "CONTINUOUS",
+    "0", "ENDTAB",
+    "0", "ENDSEC",
+    "0", "SECTION",
+    "2", "ENTITIES"
+  ];
+
+  const footer = [
+    "0", "ENDSEC",
+    "0", "EOF"
+  ];
+
+  return lines.join("\r\n") + "\r\n" + entities + footer.join("\r\n") + "\r\n";
+}
+
+function normalizeDxfPolyline(poly) {
+  const out = [];
+  for (const p of poly) {
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+    const prev = out[out.length - 1];
+    if (prev && Math.hypot(prev.x - p.x, prev.y - p.y) < 1e-6) continue;
+    out.push(p);
+  }
+
+  if (out.length > 1) {
+    const first = out[0];
+    const last = out[out.length - 1];
+    if (Math.hypot(first.x - last.x, first.y - last.y) < 1e-6) {
+      out.pop();
+    }
+  }
+
+  return out;
+}
+
+function dxfNumber(value) {
+  return Number(value.toFixed(4)).toString();
+}
+
+/* 居中绘制，支持字距 */
+function drawTextWithLetterSpacing(ctx, text, centerX, y, letterSpacingPx) {
+  if (!text) return;
+
+  const chars = Array.from(text);
+  const widths = chars.map(char => ctx.measureText(char).width);
+  const totalTextWidth =
+    widths.reduce((sum, w) => sum + w, 0) +
+    letterSpacingPx * Math.max(0, chars.length - 1);
+
+  let x = centerX - totalTextWidth / 2;
+
+  chars.forEach((char, i) => {
+    ctx.fillText(char, x + widths[i] / 2, y);
+    x += widths[i] + letterSpacingPx;
+  });
+}
+
+/* 左对齐绘制，支持字距和超长截断 */
+function drawTextWithLetterSpacingLeft(ctx, text, x, y, letterSpacingPx, maxWidth) {
+  if (!text) return;
+
+  const chars = Array.from(text);
+  let currentX = x;
+
+  for (let i = 0; i < chars.length; i++) {
+    const char = chars[i];
+    const charWidth = ctx.measureText(char).width;
+
+    if (currentX + charWidth > x + maxWidth) {
+      ctx.fillText("…", currentX, y);
+      break;
+    }
+
+    ctx.fillText(char, currentX, y);
+    currentX += charWidth + letterSpacingPx;
+  }
+}
+
+function downloadCanvas(canvas, filename) {
+  const link = document.createElement("a");
+  link.download = filename;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+}
+
+function downloadTextFile(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.download = filename;
+  link.href = url;
+  link.click();
+
+  URL.revokeObjectURL(url);
+}
+
+function fileToDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+
+    reader.readAsDataURL(file);
+  });
+}
+
+function cleanFileName(name) {
+  return String(name)
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .trim();
+}
+
+function escapeXml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function escapeCss(str) {
+  return String(str).replace(/'/g, "\\'");
+}
+
+function escapeDxfText(str) {
+  return String(str)
+    .replace(/\\/g, "\\\\")
+    .replace(/\{/g, "\\{")
+    .replace(/\}/g, "\\}")
+    .replace(/\n/g, "\\P");
+}
+
+updatePreview();
+</script>
+
+</body>
+</html>
